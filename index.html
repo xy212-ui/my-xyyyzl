@@ -1,0 +1,1368 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>鑫源供应链 · 运营品质看板</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+  <style>
+    :root {
+      --bg: #0d1117;
+      --card: #161b22;
+      --card2: #1c2230;
+      --border: #30363d;
+      --text: #e6edf3;
+      --muted: #8b949e;
+      --accent: #2563eb;
+      --accent2: #0ea5e9;
+      --green: #22c55e;
+      --red: #ef4444;
+      --yellow: #f59e0b;
+      --orange: #f97316;
+      --purple: #a855f7;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: "PingFang SC", "Microsoft YaHei", "HarmonyOS Sans", sans-serif;
+      min-height: 100vh;
+    }
+
+    /* ===== HEADER ===== */
+    header {
+      background: linear-gradient(135deg, #0d1117 0%, #1a2236 100%);
+      border-bottom: 1px solid var(--border);
+      padding: 0 32px;
+      height: 64px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+    .header-left { display: flex; align-items: center; gap: 12px; }
+    .logo-icon {
+      width: 36px; height: 36px;
+      background: linear-gradient(135deg, #2563eb, #0ea5e9);
+      border-radius: 8px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 18px;
+    }
+    .logo-text { font-size: 18px; font-weight: 700; letter-spacing: 1px; }
+    .logo-sub { font-size: 11px; color: var(--muted); margin-top: 1px; }
+    .header-right { display: flex; align-items: center; gap: 16px; }
+    #dateRange {
+      font-size: 13px; color: var(--accent2);
+      background: rgba(14,165,233,0.1);
+      border: 1px solid rgba(14,165,233,0.3);
+      border-radius: 6px;
+      padding: 4px 12px;
+    }
+    #updatedAt {
+      font-size: 12px; color: var(--muted);
+      background: rgba(139,148,158,0.1);
+      border: 1px solid rgba(139,148,158,0.2);
+      border-radius: 6px;
+      padding: 4px 10px;
+    }
+    .upload-zone {
+      display: flex; gap: 10px;
+    }
+    .upload-btn {
+      display: flex; align-items: center; gap: 6px;
+      background: rgba(37,99,235,0.15);
+      border: 1px dashed rgba(37,99,235,0.5);
+      color: var(--accent2);
+      border-radius: 8px;
+      padding: 6px 14px;
+      font-size: 13px;
+      cursor: pointer;
+      transition: all 0.2s;
+      position: relative;
+      overflow: hidden;
+    }
+    .upload-btn:hover {
+      background: rgba(37,99,235,0.25);
+      border-color: var(--accent2);
+    }
+    .upload-btn input[type=file] {
+      position: absolute; inset: 0; opacity: 0; cursor: pointer;
+    }
+    .upload-btn .icon { font-size: 16px; }
+
+    /* ===== SYNC STATUS BAR ===== */
+    .sync-bar {
+      background: rgba(34,197,94,0.08);
+      border: 1px solid rgba(34,197,94,0.2);
+      border-radius: 8px;
+      padding: 10px 20px;
+      margin: 16px 32px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      font-size: 13px;
+    }
+    .sync-bar .sync-icon { font-size: 18px; }
+    .sync-bar .sync-text { color: var(--text); }
+    .sync-bar .sync-hint { color: var(--muted); margin-left: auto; }
+
+    /* ===== MAIN ===== */
+    main { padding: 24px 32px; max-width: 1800px; margin: 0 auto; }
+
+    /* ===== SECTION TITLE ===== */
+    .section-title {
+      font-size: 15px; font-weight: 700; color: var(--text);
+      display: flex; align-items: center; gap: 8px;
+      margin-bottom: 16px; margin-top: 28px;
+    }
+    .section-title::before {
+      content: ''; width: 4px; height: 18px;
+      background: linear-gradient(180deg, var(--accent), var(--accent2));
+      border-radius: 2px;
+    }
+
+    /* ===== KPI GRID ===== */
+    .kpi-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+      gap: 16px;
+    }
+    .kpi-card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 20px;
+      position: relative;
+      overflow: hidden;
+      transition: transform 0.2s, border-color 0.2s;
+    }
+    .kpi-card:hover { transform: translateY(-2px); border-color: var(--accent); }
+    .kpi-card .glow {
+      position: absolute; top: -20px; right: -20px;
+      width: 80px; height: 80px;
+      border-radius: 50%;
+      opacity: 0.15;
+    }
+    .kpi-label { font-size: 12px; color: var(--muted); margin-bottom: 8px; }
+    .kpi-value { font-size: 28px; font-weight: 800; line-height: 1; }
+    .kpi-sub { font-size: 12px; color: var(--muted); margin-top: 6px; }
+    .kpi-badge {
+      display: inline-block;
+      font-size: 11px; font-weight: 600;
+      padding: 2px 8px; border-radius: 100px;
+      margin-top: 8px;
+    }
+    .badge-green { background: rgba(34,197,94,0.15); color: var(--green); }
+    .badge-red { background: rgba(239,68,68,0.15); color: var(--red); }
+    .badge-yellow { background: rgba(245,158,11,0.15); color: var(--yellow); }
+    .kpi-clickable { cursor: pointer; transition: transform 0.15s; }
+    .kpi-clickable:hover { transform: translateY(-2px); }
+    .kpi-clickable:hover .kpi-detail-hint { opacity: 1; }
+    .kpi-detail-hint { font-size: 11px; color: var(--muted); opacity: 0.6; margin-top: 4px; transition: opacity 0.2s; }
+
+    /* ===== DETAIL MODAL ===== */
+    .modal-overlay {
+      position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+      background: rgba(0,0,0,0.6); z-index: 9999;
+      display: flex; align-items: center; justify-content: center;
+      opacity: 0; pointer-events: none; transition: opacity 0.25s;
+    }
+    .modal-overlay.active { opacity: 1; pointer-events: auto; }
+    .modal-box {
+      background: #1c2333; border: 1px solid rgba(255,255,255,0.1);
+      border-radius: 12px; width: 90%; max-width: 520px; max-height: 80vh;
+      padding: 24px; overflow: hidden;
+      transform: translateY(20px); transition: transform 0.25s;
+    }
+    .modal-overlay.active .modal-box { transform: translateY(0); }
+    .modal-header {
+      display: flex; align-items: center; justify-content: space-between;
+      margin-bottom: 16px;
+    }
+    .modal-title { font-size: 18px; font-weight: 700; color: #e6edf3; }
+    .modal-close {
+      width: 32px; height: 32px; border: none; background: rgba(255,255,255,0.08);
+      color: #8b949e; font-size: 18px; border-radius: 8px; cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+    }
+    .modal-close:hover { background: rgba(255,255,255,0.15); color: #e6edf3; }
+    .modal-table-wrap { overflow-y: auto; max-height: calc(80vh - 80px); }
+    .modal-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    .modal-table th {
+      background: rgba(255,255,255,0.06); color: #8b949e;
+      padding: 8px 12px; text-align: center; font-weight: 600; border-bottom: 1px solid rgba(255,255,255,0.1);
+    }
+    .modal-table td {
+      padding: 8px 12px; text-align: center; color: #e6edf3;
+      border-bottom: 1px solid rgba(255,255,255,0.04);
+    }
+    .modal-table tr:hover td { background: rgba(255,255,255,0.04); }
+    .modal-count { font-size: 13px; color: #8b949e; margin-bottom: 8px; }
+
+    /* ===== CHART GRID ===== */
+    .chart-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(480px, 1fr));
+      gap: 20px;
+    }
+    .chart-card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 20px;
+    }
+    .chart-card h3 {
+      font-size: 14px; font-weight: 600; color: var(--muted);
+      margin-bottom: 16px;
+      display: flex; align-items: center; gap: 6px;
+    }
+    .chart-card h3 .dot {
+      width: 8px; height: 8px; border-radius: 50%;
+      background: var(--accent2);
+    }
+    .chart-wrap { position: relative; height: 260px; }
+
+    /* ===== TABLE ===== */
+    .table-wrap { overflow-x: auto; }
+    table {
+      width: 100%; border-collapse: collapse;
+      font-size: 13px;
+    }
+    thead th {
+      background: var(--card2);
+      padding: 10px 12px;
+      text-align: left;
+      color: var(--muted);
+      font-weight: 600;
+      border-bottom: 1px solid var(--border);
+      white-space: nowrap;
+    }
+    tbody tr {
+      border-bottom: 1px solid rgba(48,54,61,0.5);
+      transition: background 0.15s;
+    }
+    tbody tr:hover { background: rgba(37,99,235,0.06); }
+    tbody td {
+      padding: 9px 12px;
+      white-space: nowrap;
+    }
+    .td-name { font-weight: 600; color: var(--text); }
+    .pct { font-size: 11px; color: var(--muted); }
+    .bar-wrap { display: flex; align-items: center; gap: 8px; }
+    .bar-bg { flex: 1; height: 6px; background: rgba(255,255,255,0.08); border-radius: 3px; min-width: 60px; }
+    .bar-fill { height: 100%; border-radius: 3px; }
+    .bar-green { background: var(--green); }
+    .bar-red { background: var(--red); }
+    .bar-yellow { background: var(--yellow); }
+
+    /* ===== PENALTY GRID ===== */
+    .penalty-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+      gap: 20px;
+    }
+
+    /* ===== TABS ===== */
+    .tabs { display: flex; gap: 4px; margin-bottom: 20px; }
+    .tab {
+      padding: 7px 18px; border-radius: 8px;
+      font-size: 13px; font-weight: 600; cursor: pointer;
+      transition: all 0.2s;
+      background: transparent; border: 1px solid var(--border);
+      color: var(--muted);
+    }
+    .tab.active {
+      background: rgba(37,99,235,0.2);
+      border-color: var(--accent);
+      color: var(--accent2);
+    }
+    .tab-panel { display: none; }
+    .tab-panel.active { display: block; }
+
+    /* ===== TOAST ===== */
+    #toast {
+      position: fixed; bottom: 24px; right: 24px;
+      background: #1e293b; border: 1px solid var(--border);
+      border-radius: 10px; padding: 12px 20px;
+      font-size: 13px; color: var(--text);
+      transform: translateY(80px); opacity: 0;
+      transition: all 0.3s; z-index: 999;
+      display: flex; align-items: center; gap: 8px;
+    }
+    #toast.show { transform: translateY(0); opacity: 1; }
+
+    /* ===== LOADING ===== */
+    #loading {
+      position: fixed; inset: 0;
+      background: rgba(13,17,23,0.85);
+      display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+      z-index: 998;
+      display: none;
+    }
+    .spinner {
+      width: 40px; height: 40px;
+      border: 3px solid var(--border);
+      border-top-color: var(--accent2);
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ===== PROGRESS RING ===== */
+    .ring-wrap {
+      display: flex; align-items: center; justify-content: center; gap: 20px;
+      flex-wrap: wrap;
+    }
+    .ring-item { text-align: center; }
+    .ring-label { font-size: 12px; color: var(--muted); margin-top: 6px; }
+    .ring-val { font-size: 13px; font-weight: 700; }
+
+    @media (max-width: 768px) {
+      header { padding: 0 16px; flex-wrap: wrap; height: auto; padding-top: 12px; padding-bottom: 12px; }
+      .header-right { flex-wrap: wrap; }
+      main { padding: 16px; }
+      .chart-grid { grid-template-columns: 1fr; }
+      .penalty-grid { grid-template-columns: 1fr; }
+      .sync-bar { margin: 12px 16px; }
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <div class="header-left">
+    <div class="logo-icon">🚚</div>
+    <div>
+      <div class="logo-text">鑫源供应链运营品质看板</div>
+      <div class="logo-sub">Xinyuan Supply Chain Quality Dashboard</div>
+    </div>
+  </div>
+  <div class="header-right">
+    <div id="updatedAt">更新时间：--</div>
+    <div id="dateRange">日期：--</div>
+    <div class="upload-zone">
+      <label class="upload-btn">
+        <span class="icon">📊</span>
+        <span>上传时效报表</span>
+        <input type="file" accept=".xlsx,.xls" id="fileTimeEffect" />
+      </label>
+      <label class="upload-btn">
+        <span class="icon">📋</span>
+        <span>上传操作规范报表</span>
+        <input type="file" accept=".xlsx,.xls" id="fileOperation" />
+      </label>
+    </div>
+  </div>
+</header>
+
+<div class="sync-bar" id="syncBar">
+  <span class="sync-icon">🌐</span>
+  <span class="sync-text">数据已同步至云端 — 所有人打开此链接即可看到最新数据</span>
+  <span class="sync-hint" id="syncHint">上传Excel后数据自动保存，全员实时可见</span>
+</div>
+
+<main>
+  <!-- KPI 总览 -->
+  <div class="section-title">📦 核心 KPI 总览</div>
+  <div class="kpi-grid" id="kpiGrid"></div>
+
+  <!-- 时效分析 -->
+  <div class="section-title">⏱ 时效分析</div>
+  <div class="tabs">
+    <div class="tab active" data-tab="delivery">送货时效</div>
+    <div class="tab" data-tab="transfer">中转时效</div>
+  </div>
+  <div class="tab-panel active" id="tab-delivery">
+    <div class="chart-grid">
+      <div class="chart-card">
+        <h3><span class="dot"></span>各站点送货时效分布（%）</h3>
+        <div class="chart-wrap"><canvas id="chartDelivery"></canvas></div>
+      </div>
+      <div class="chart-card">
+        <h3><span class="dot" style="background:var(--red)"></span>超48小时送货排行</h3>
+        <div class="chart-wrap"><canvas id="chartDeliveryOver"></canvas></div>
+      </div>
+    </div>
+    <div class="chart-card" style="margin-top:20px">
+      <h3><span class="dot"></span>送货时效明细表</h3>
+      <div class="table-wrap"><table id="tableDelivery"></table></div>
+    </div>
+  </div>
+  <div class="tab-panel" id="tab-transfer">
+    <div class="chart-grid">
+      <div class="chart-card">
+        <h3><span class="dot" style="background:var(--purple)"></span>各站点中转时效分布（%）</h3>
+        <div class="chart-wrap"><canvas id="chartTransfer"></canvas></div>
+      </div>
+      <div class="chart-card">
+        <h3><span class="dot" style="background:var(--red)"></span>超48小时中转排行</h3>
+        <div class="chart-wrap"><canvas id="chartTransferOver"></canvas></div>
+      </div>
+    </div>
+    <div class="chart-card" style="margin-top:20px">
+      <h3><span class="dot" style="background:var(--purple)"></span>中转时效明细表</h3>
+      <div class="table-wrap"><table id="tableTransfer"></table></div>
+    </div>
+  </div>
+
+  <!-- 系统操作规范 -->
+  <div class="section-title">📋 系统操作规范化</div>
+  <div class="chart-grid">
+    <div class="chart-card">
+      <h3><span class="dot" style="background:var(--yellow)"></span>各站点预罚合计（元）</h3>
+      <div class="chart-wrap"><canvas id="chartPenalty"></canvas></div>
+    </div>
+    <div class="chart-card">
+      <h3><span class="dot" style="background:var(--orange)"></span>异常类型分布</h3>
+      <div class="chart-wrap"><canvas id="chartAbnormal"></canvas></div>
+    </div>
+  </div>
+  <div class="chart-card" style="margin-top:20px">
+    <h3><span class="dot" style="background:var(--yellow)"></span>系统操作规范明细表</h3>
+    <div class="table-wrap"><table id="tableOperation"></table></div>
+  </div>
+</main>
+
+<!-- 明细弹窗 -->
+<div id="detailModal" class="modal-overlay">
+  <div class="modal-box">
+    <div class="modal-header">
+      <span id="modalTitle" class="modal-title">明细</span>
+      <button id="modalClose" class="modal-close">×</button>
+    </div>
+    <div id="modalCount" class="modal-count">共 0 条记录</div>
+    <div id="modalTableWrap" class="modal-table-wrap"></div>
+  </div>
+</div>
+
+<div id="toast">✅ 数据加载成功</div>
+<div id="loading"><div class="spinner"></div><p style="margin-top:12px;color:var(--muted);font-size:13px">正在解析数据...</p></div>
+
+<script>
+// ============================================================
+//  工具函数
+// ============================================================
+const $ = id => document.getElementById(id);
+let charts = {};
+
+function showToast(msg, isErr) {
+  const t = $('toast');
+  t.innerHTML = (isErr ? '❌ ' : '✅ ') + msg;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 3000);
+}
+function showLoading(v) { $('loading').style.display = v ? 'flex' : 'none'; }
+function pct(v) { return (parseFloat(v) * 100).toFixed(1) + '%'; }
+function fmtPct(v) {
+  const n = parseFloat(v);
+  if (isNaN(n)) return '-';
+  return (n * 100).toFixed(1) + '%';
+}
+function destroyChart(id) { if (charts[id]) { charts[id].destroy(); delete charts[id]; } }
+
+// ============================================================
+//  格式化更新时间
+// ============================================================
+function formatTime(iso) {
+  if (!iso) return '--';
+  const d = new Date(iso);
+  return d.getFullYear() + '-' +
+    String(d.getMonth()+1).padStart(2,'0') + '-' +
+    String(d.getDate()).padStart(2,'0') + ' ' +
+    String(d.getHours()).padStart(2,'0') + ':' +
+    String(d.getMinutes()).padStart(2,'0');
+}
+
+// ============================================================
+//  Tab 切换
+// ============================================================
+document.querySelectorAll('.tab').forEach(tab => {
+  tab.addEventListener('click', () => {
+    document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+    document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+    tab.classList.add('active');
+    $('tab-' + tab.dataset.tab).classList.add('active');
+  });
+});
+
+// ============================================================
+//  读取 Excel
+// ============================================================
+function readExcel(file) {
+  return new Promise((res, rej) => {
+    const reader = new FileReader();
+    reader.onload = e => {
+      try {
+        const wb = XLSX.read(e.target.result, { type: 'array' });
+        res(wb);
+      } catch(err) { rej(err); }
+    };
+    reader.onerror = rej;
+    reader.readAsArrayBuffer(file);
+  });
+}
+
+function sheetToRows(ws) {
+  return XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' });
+}
+
+// ============================================================
+//  解析时效报表
+// ============================================================
+function parseTimeEffect(wb) {
+  const data = {};
+
+  // 送货时效播报表
+  if (wb.SheetNames.includes('送货时效播报表')) {
+    const rows = sheetToRows(wb.Sheets['送货时效播报表']);
+    const titleStr = String(rows[0]?.[0] || '');
+    const m = titleStr.match(/(\d+\.\d+[-–~]\d+\.\d+|\d+月[\s\S]{0,20})/);
+    data.dateRange = m ? m[0].trim() : titleStr.replace(/\s+/g, ' ').trim();
+
+    const delivery = [];
+    for (let i = 3; i < rows.length; i++) {
+      const r = rows[i];
+      if (!r[0] || String(r[0]).trim() === '') continue;
+      delivery.push({
+        name: String(r[0]).trim(),
+        total: parseInt(r[1]) || 0,
+        over48: parseInt(r[2]) || 0,
+        over48pct: parseFloat(r[3]) || 0,
+        over48fine: parseInt(r[4]) || 0,
+        h24_48: parseInt(r[5]) || 0,
+        h24_48pct: parseFloat(r[6]) || 0,
+        h24: parseInt(r[7]) || 0,
+        h24pct: parseFloat(r[8]) || 0,
+        abnormal: parseInt(r[9]) || 0,
+      });
+    }
+    data.delivery = delivery;
+  }
+
+  // 中转时效播报表
+  if (wb.SheetNames.includes('中转时效播报表')) {
+    const rows = sheetToRows(wb.Sheets['中转时效播报表']);
+    const transfer = [];
+    for (let i = 3; i < rows.length; i++) {
+      const r = rows[i];
+      if (!r[0] || String(r[0]).trim() === '') continue;
+      transfer.push({
+        name: String(r[0]).trim(),
+        total: parseInt(r[1]) || 0,
+        over48: parseInt(r[2]) || 0,
+        over48pct: parseFloat(r[3]) || 0,
+        over48fine: parseInt(r[4]) || 0,
+        h24_48: parseInt(r[5]) || 0,
+        h24_48pct: parseFloat(r[6]) || 0,
+        h24: parseInt(r[7]) || 0,
+        h24pct: parseFloat(r[8]) || 0,
+        abnormal: parseInt(r[9]) || 0,
+      });
+    }
+    data.transfer = transfer;
+  }
+
+  return data;
+}
+
+// ============================================================
+//  解析操作规范报表
+// ============================================================
+function parseOperation(wb) {
+  const data = {};
+
+  const sheetName = wb.SheetNames.find(n => n.includes('播报表')) || wb.SheetNames[0];
+  const rows = sheetToRows(wb.Sheets[sheetName]);
+
+  const ops = [];
+  for (let i = 3; i < rows.length; i++) {
+    const r = rows[i];
+    const name = String(r[0] || '').trim();
+    if (!name || name.startsWith('说明') || name.startsWith('1：') || name.startsWith('2：') || name.startsWith('3：')) break;
+    ops.push({
+      name,
+      totalFine: parseFloat(r[1]) || 0,
+      openTotal: parseInt(r[2]) || 0,
+      openAbnormal: parseInt(r[3]) || 0,
+      openPct: parseFloat(r[4]) || 0,
+      openFine: parseFloat(r[5]) || 0,
+      loadTotal: parseInt(r[6]) || 0,
+      loadAbnormal: parseInt(r[7]) || 0,
+      loadPct: parseFloat(r[8]) || 0,
+      loadFine: parseFloat(r[9]) || 0,
+      delivTotal: parseInt(r[10]) || 0,
+      delivAbnormal: parseInt(r[11]) || 0,
+      delivPct: parseFloat(r[12]) || 0,
+      delivFine: parseFloat(r[13]) || 0,
+      confirmTickets: parseInt(r[14]) || 0,
+      confirmFine: parseFloat(r[15]) || 0,
+      selfPickup: String(r[16] || '').trim(),
+      selfPickupFine: parseFloat(r[17]) || 0,
+    });
+  }
+  data.ops = ops;
+
+  const complainSheet = wb.SheetNames.find(n => n.includes('有责异常'));
+  if (complainSheet) {
+    const cRows = sheetToRows(wb.Sheets[complainSheet]);
+    data.complainCount = cRows.slice(1).filter(r => r.some(v => String(v).trim() !== '')).length;
+  } else {
+    data.complainCount = 0;
+  }
+
+  return data;
+}
+
+// ============================================================
+//  解析时效报表的明细sheet
+// ============================================================
+function parseTimeDetails(wb) {
+  const s1 = wb.SheetNames.find(n => n.includes('超48小时送货明细') || n.includes('超48h送货明细'));
+  if (s1) {
+    const rows = sheetToRows(wb.Sheets[s1]);
+    STATE.details.deliveryOver48 = rows.slice(1).filter(r => r[0] && String(r[0]).trim() !== '').map(r => ({ id: String(r[0]).trim(), station: String(r[14] || '').trim() }));
+  }
+
+  const s2 = wb.SheetNames.find(n => n.includes('超48小时中转明细') || n.includes('超48h中转明细'));
+  if (s2) {
+    const rows = sheetToRows(wb.Sheets[s2]);
+    STATE.details.transferOver48 = rows.slice(1).filter(r => r[0] && String(r[0]).trim() !== '').map(r => ({ id: String(r[0]).trim(), station: String(r[14] || '').trim() }));
+  }
+}
+
+// ============================================================
+//  解析操作规范报表的明细sheet
+// ============================================================
+function parseOperationDetails(wb) {
+  const s1 = wb.SheetNames.find(n => n.includes('签收异常明细'));
+  if (s1) {
+    const rows = sheetToRows(wb.Sheets[s1]);
+    STATE.details.signAbnormal = rows.slice(1).filter(r => r[1] && String(r[1]).trim() !== '').map(r => ({ id: String(r[1]).trim(), station: String(r[12] || '').trim() }));
+  }
+
+  const s2 = wb.SheetNames.find(n => n.includes('未及时操作确认') || n.includes('到货确认延迟'));
+  if (s2) {
+    const rows = sheetToRows(wb.Sheets[s2]);
+    STATE.details.confirmDelay = rows.slice(1).filter(r => r[0] && String(r[0]).trim() !== '').map(r => ({ id: String(r[0]).trim(), station: String(r[1] || '').trim() }));
+  }
+
+  const s3 = wb.SheetNames.find(n => n.includes('有责异常'));
+  if (s3) {
+    const rows = sheetToRows(wb.Sheets[s3]);
+    STATE.details.complain = rows.slice(1).filter(r => r[3] && String(r[3]).trim() !== '').map(r => ({ id: String(r[3]).trim(), station: String(r[1] || '').trim() }));
+  }
+}
+
+// ============================================================
+//  全局数据状态
+// ============================================================
+let STATE = {
+  timeEffect: null,
+  operation: null,
+  details: {
+    deliveryOver48: [],
+    transferOver48: [],
+    signAbnormal: [],
+    confirmDelay: [],
+    complain: [],
+  },
+};
+
+// ============================================================
+//  ★★★ 云端数据同步 ★★★
+// ============================================================
+
+// 从服务器或localStorage获取最新数据
+async function fetchServerData() {
+  // 1. 尝试从服务器API获取
+  try {
+    const resp = await fetch('/api/data');
+    const result = await resp.json();
+    if (result.success && result.data) {
+      if (result.data.timeEffect) STATE.timeEffect = result.data.timeEffect;
+      if (result.data.operation) STATE.operation = result.data.operation;
+      if (result.data.details) STATE.details = result.data.details;
+      if (result.data.updatedAt) {
+        $('updatedAt').textContent = '更新时间：' + formatTime(result.data.updatedAt);
+      }
+      // 同时缓存到localStorage
+      saveToLocal();
+      $('syncBar').style.background = 'rgba(34,197,94,0.08)';
+      $('syncBar').style.borderColor = 'rgba(34,197,94,0.2)';
+      $('syncHint').textContent = '✅ 数据来自服务器，全员可见';
+      return true;
+    }
+  } catch (err) {
+    console.warn('服务器不可达，尝试本地缓存:', err);
+  }
+
+  // 2. 尝试从localStorage获取
+  try {
+    const local = localStorage.getItem('xinyuan_dashboard_data');
+    if (local) {
+      const data = JSON.parse(local);
+      if (data.timeEffect) STATE.timeEffect = data.timeEffect;
+      if (data.operation) STATE.operation = data.operation;
+      if (data.details) STATE.details = data.details;
+      if (data.updatedAt) {
+        $('updatedAt').textContent = '更新时间：' + formatTime(data.updatedAt);
+      }
+      $('syncBar').style.background = 'rgba(245,158,11,0.08)';
+      $('syncBar').style.borderColor = 'rgba(245,158,11,0.2)';
+      $('syncHint').textContent = '⚠️ 数据来自本地缓存，仅当前浏览器可见（需部署后端服务器才能全员共享）';
+      return true;
+    }
+  } catch (err) {
+    console.warn('localStorage读取失败:', err);
+  }
+
+  return false;
+}
+
+// 保存数据到localStorage
+function saveToLocal() {
+  try {
+    const data = {
+      timeEffect: STATE.timeEffect,
+      operation: STATE.operation,
+      details: STATE.details,
+      updatedAt: STATE.updatedAt || new Date().toISOString(),
+    };
+    localStorage.setItem('xinyuan_dashboard_data', JSON.stringify(data));
+  } catch (err) {
+    console.warn('localStorage保存失败:', err);
+  }
+}
+
+// 保存数据到服务器
+async function saveToServer() {
+  // 先保存到localStorage（确保本地也有）
+  STATE.updatedAt = new Date().toISOString();
+  saveToLocal();
+  $('updatedAt').textContent = '更新时间：' + formatTime(STATE.updatedAt);
+
+  // 尝试保存到服务器
+  try {
+    const resp = await fetch('/api/data', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        timeEffect: STATE.timeEffect,
+        operation: STATE.operation,
+        details: STATE.details,
+      }),
+    });
+    const result = await resp.json();
+    if (result.success) {
+      $('updatedAt').textContent = '更新时间：' + formatTime(result.updatedAt);
+      $('syncBar').style.background = 'rgba(34,197,94,0.08)';
+      $('syncBar').style.borderColor = 'rgba(34,197,94,0.2)';
+      $('syncHint').textContent = '✅ 数据已保存至服务器，全员可见';
+      showToast('数据已同步至云端，所有人可查看');
+      // 更新localStorage缓存
+      STATE.updatedAt = result.updatedAt;
+      saveToLocal();
+    } else {
+      $('syncBar').style.background = 'rgba(245,158,11,0.08)';
+      $('syncBar').style.borderColor = 'rgba(245,158,11,0.2)';
+      $('syncHint').textContent = '⚠️ 数据已保存至本地，仅当前浏览器可见';
+      showToast('数据已保存（本地模式），部署后端后可实现全员共享');
+    }
+  } catch (err) {
+    console.warn('保存到服务器失败:', err);
+    $('syncBar').style.background = 'rgba(245,158,11,0.08)';
+    $('syncBar').style.borderColor = 'rgba(245,158,11,0.2)';
+    $('syncHint').textContent = '⚠️ 数据已保存至本地，仅当前浏览器可见';
+    showToast('数据已保存（本地模式），部署后端后可实现全员共享');
+  }
+}
+
+// ============================================================
+//  渲染全部
+// ============================================================
+function renderAll() {
+  const te = STATE.timeEffect;
+  const op = STATE.operation;
+
+  if (te?.dateRange) $('dateRange').textContent = '日期：' + te.dateRange;
+
+  renderKPI(te, op);
+  if (te?.delivery) renderDelivery(te.delivery);
+  if (te?.transfer) renderTransfer(te.transfer);
+  if (op?.ops) renderOperation(op.ops);
+}
+
+// ============================================================
+//  KPI 卡片
+// ============================================================
+function renderKPI(te, op) {
+  const grid = $('kpiGrid');
+  grid.innerHTML = '';
+
+  const cards = [];
+
+  if (te?.delivery) {
+    const d = te.delivery.find(r => r.name === '总计') || te.delivery[0];
+    const ontime48 = d.h24 + d.h24_48;
+    const ontime48pct = d.total > 0 ? ontime48 / d.total : 0;
+    cards.push({
+      label: '送货总票数',
+      value: d.total.toLocaleString(),
+      sub: '本期累计',
+      color: '#2563eb',
+      badge: null
+    });
+    cards.push({
+      label: '送货准时率（48h内）',
+      value: (ontime48pct * 100).toFixed(1) + '%',
+      sub: `48h内送达 ${ontime48} 票`,
+      color: '#22c55e',
+      badge: ontime48pct >= 0.95 ? { text: '达标', cls: 'badge-green' } : { text: '待提升', cls: 'badge-yellow' }
+    });
+    cards.push({
+      label: '超48h送货票数',
+      value: d.over48.toLocaleString(),
+      sub: `占比 ${(d.over48pct * 100).toFixed(1)}%`,
+      color: '#ef4444',
+      badge: d.over48 > 0 ? { text: '需关注', cls: 'badge-red' } : { text: '良好', cls: 'badge-green' },
+      detail: 'deliveryOver48'
+    });
+  }
+
+  if (te?.transfer) {
+    const t = te.transfer.find(r => r.name === '总计') || te.transfer[0];
+    const ontime48 = t.h24 + t.h24_48;
+    const ontime48pct = t.total > 0 ? ontime48 / t.total : 0;
+    cards.push({
+      label: '中转总票数',
+      value: t.total.toLocaleString(),
+      sub: '本期累计',
+      color: '#a855f7',
+      badge: null
+    });
+    cards.push({
+      label: '中转准时率（48h内）',
+      value: (ontime48pct * 100).toFixed(1) + '%',
+      sub: `48h内中转 ${ontime48} 票`,
+      color: '#22c55e',
+      badge: ontime48pct >= 0.95 ? { text: '达标', cls: 'badge-green' } : { text: '待提升', cls: 'badge-yellow' }
+    });
+    cards.push({
+      label: '超48h中转票数',
+      value: t.over48.toLocaleString(),
+      sub: `占比 ${(t.over48pct * 100).toFixed(1)}%`,
+      color: '#ef4444',
+      badge: t.over48 > 0 ? { text: '需关注', cls: 'badge-red' } : { text: '良好', cls: 'badge-green' },
+      detail: 'transferOver48'
+    });
+  }
+
+  if (op?.ops) {
+    const total = op.ops.find(r => r.name === '合计') || op.ops[0];
+    cards.push({
+      label: '签收异常票数',
+      value: total.delivAbnormal.toLocaleString(),
+      sub: `签收总票 ${total.delivTotal}`,
+      color: '#f97316',
+      badge: total.delivAbnormal === 0 ? { text: '零异常', cls: 'badge-green' } : { text: '需整改', cls: 'badge-red' },
+      detail: 'signAbnormal'
+    });
+    cards.push({
+      label: '到货确认延迟票数',
+      value: total.confirmTickets.toLocaleString(),
+      sub: `预罚 ¥${total.confirmFine}`,
+      color: '#f59e0b',
+      badge: total.confirmTickets === 0 ? { text: '零异常', cls: 'badge-green' } : { text: '需整改', cls: 'badge-red' },
+      detail: 'confirmDelay'
+    });
+    const complainCount = op.complainCount ?? 0;
+    cards.push({
+      label: '有责投诉票数',
+      value: complainCount.toLocaleString(),
+      sub: '本期有责异常',
+      color: '#ef4444',
+      badge: complainCount === 0 ? { text: '零投诉', cls: 'badge-green' } : { text: '需跟进', cls: 'badge-red' },
+      detail: 'complain'
+    });
+  }
+
+  cards.forEach(c => {
+    const el = document.createElement('div');
+    el.className = 'kpi-card' + (c.detail ? ' kpi-clickable' : '');
+    if (c.detail) el.setAttribute('data-detail', c.detail);
+    el.innerHTML = `
+      <div class="glow" style="background:${c.color}"></div>
+      <div class="kpi-label">${c.label}</div>
+      <div class="kpi-value" style="color:${c.color}">${c.value}</div>
+      <div class="kpi-sub">${c.sub}</div>
+      ${c.badge ? `<span class="kpi-badge ${c.badge.cls}">${c.badge.text}</span>` : ''}
+      ${c.detail ? '<div class="kpi-detail-hint">点击查看明细 ▸</div>' : ''}
+    `;
+    if (c.detail) {
+      el.addEventListener('click', () => showDetailModal(c.label, c.detail));
+    }
+    grid.appendChild(el);
+  });
+}
+
+// ============================================================
+//  送货时效图表
+// ============================================================
+function renderDelivery(rows) {
+  const data = rows.filter(r => r.name !== '总计' && r.total > 0);
+  const labels = data.map(r => r.name);
+
+  destroyChart('chartDelivery');
+  charts.chartDelivery = new Chart($('chartDelivery').getContext('2d'), {
+    type: 'bar',
+    data: {
+      labels,
+      datasets: [
+        { label: '24小时内', data: data.map(r => +(r.h24pct * 100).toFixed(1)), backgroundColor: 'rgba(34,197,94,0.75)', borderRadius: 2 },
+        { label: '24-48小时', data: data.map(r => +(r.h24_48pct * 100).toFixed(1)), backgroundColor: 'rgba(245,158,11,0.75)', borderRadius: 2 },
+        { label: '超48小时', data: data.map(r => +(r.over48pct * 100).toFixed(1)), backgroundColor: 'rgba(239,68,68,0.75)', borderRadius: 2 },
+      ]
+    },
+    options: chartStackedOpts('送货占比 %')
+  });
+
+  const over = [...data].filter(r => r.over48 > 0).sort((a,b) => b.over48 - a.over48).slice(0,12);
+  destroyChart('chartDeliveryOver');
+  charts.chartDeliveryOver = new Chart($('chartDeliveryOver').getContext('2d'), {
+    type: 'bar',
+    data: {
+      labels: over.map(r => r.name),
+      datasets: [{ label: '超48h票数', data: over.map(r => r.over48), backgroundColor: 'rgba(239,68,68,0.8)', borderRadius: 4 }]
+    },
+    options: chartBarOpts('票数', '#ef4444')
+  });
+
+  renderTable('tableDelivery', [
+    ['站点','总计','超48h票数','超48h占比','超48h罚款','24-48h票数','24-48h占比','24h内票数','24h内占比','异常(预约剔除)'],
+    ...rows.map(r => [
+      r.name, r.total,
+      r.over48, fmtPct(r.over48pct), r.over48fine > 0 ? '¥'+r.over48fine : '-',
+      r.h24_48, fmtPct(r.h24_48pct),
+      r.h24, fmtPct(r.h24pct),
+      r.abnormal
+    ])
+  ], {
+    colorCols: { 3: 'red', 7: 'green' }
+  });
+}
+
+// ============================================================
+//  中转时效图表
+// ============================================================
+function renderTransfer(rows) {
+  const data = rows.filter(r => r.name !== '总计' && r.total > 0);
+  const labels = data.map(r => r.name);
+
+  destroyChart('chartTransfer');
+  charts.chartTransfer = new Chart($('chartTransfer').getContext('2d'), {
+    type: 'bar',
+    data: {
+      labels,
+      datasets: [
+        { label: '24小时内', data: data.map(r => +(r.h24pct * 100).toFixed(1)), backgroundColor: 'rgba(168,85,247,0.75)', borderRadius: 2 },
+        { label: '24-48小时', data: data.map(r => +(r.h24_48pct * 100).toFixed(1)), backgroundColor: 'rgba(245,158,11,0.75)', borderRadius: 2 },
+        { label: '超48小时', data: data.map(r => +(r.over48pct * 100).toFixed(1)), backgroundColor: 'rgba(239,68,68,0.75)', borderRadius: 2 },
+      ]
+    },
+    options: chartStackedOpts('中转占比 %')
+  });
+
+  const over = [...data].filter(r => r.over48 > 0).sort((a,b) => b.over48 - a.over48).slice(0,12);
+  destroyChart('chartTransferOver');
+  charts.chartTransferOver = new Chart($('chartTransferOver').getContext('2d'), {
+    type: 'bar',
+    data: {
+      labels: over.map(r => r.name),
+      datasets: [{ label: '超48h票数', data: over.map(r => r.over48), backgroundColor: 'rgba(239,68,68,0.8)', borderRadius: 4 }]
+    },
+    options: chartBarOpts('票数', '#ef4444')
+  });
+
+  renderTable('tableTransfer', [
+    ['站点','总计','超48h票数','超48h占比','超48h罚款','24-48h票数','24-48h占比','24h内票数','24h内占比','异常'],
+    ...rows.map(r => [
+      r.name, r.total,
+      r.over48, fmtPct(r.over48pct), r.over48fine > 0 ? '¥'+r.over48fine : '-',
+      r.h24_48, fmtPct(r.h24_48pct),
+      r.h24, fmtPct(r.h24pct),
+      r.abnormal
+    ])
+  ], { colorCols: { 3: 'red', 7: 'green' } });
+}
+
+// ============================================================
+//  操作规范图表
+// ============================================================
+function renderOperation(ops) {
+  const data = ops.filter(r => r.name !== '合计');
+
+  const sorted = [...data].sort((a,b) => b.totalFine - a.totalFine).slice(0, 16);
+  destroyChart('chartPenalty');
+  charts.chartPenalty = new Chart($('chartPenalty').getContext('2d'), {
+    type: 'bar',
+    data: {
+      labels: sorted.map(r => r.name),
+      datasets: [{ label: '预罚合计(元)', data: sorted.map(r => r.totalFine), backgroundColor: sorted.map(r => r.totalFine > 50 ? 'rgba(239,68,68,0.8)' : r.totalFine > 20 ? 'rgba(245,158,11,0.8)' : 'rgba(34,197,94,0.7)'), borderRadius: 4 }]
+    },
+    options: chartBarOpts('元', '#f59e0b')
+  });
+
+  const total = ops.find(r => r.name === '合计') || ops[0];
+  destroyChart('chartAbnormal');
+  charts.chartAbnormal = new Chart($('chartAbnormal').getContext('2d'), {
+    type: 'doughnut',
+    data: {
+      labels: ['开单异常罚款', '配载异常罚款', '签收异常罚款', '到货确认罚款'],
+      datasets: [{
+        data: [total.openFine, total.loadFine, total.delivFine, total.confirmFine],
+        backgroundColor: ['rgba(239,68,68,0.8)','rgba(245,158,11,0.8)','rgba(168,85,247,0.8)','rgba(14,165,233,0.8)'],
+        borderColor: '#161b22', borderWidth: 2,
+      }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: {
+        legend: { position: 'right', labels: { color: '#8b949e', font: { size: 12 }, boxWidth: 12 } },
+        tooltip: { callbacks: { label: ctx => ` ${ctx.label}: ¥${ctx.parsed}` } }
+      }
+    }
+  });
+
+  renderTable('tableOperation', [
+    ['站点','预罚合计','开单票数','开单异常','开单占比','开单罚款','配载车数','配载异常','配载占比','配载罚款','签收票数','签收异常','签收占比','签收罚款','到货确认票','确认罚款','自提出库','自提罚款'],
+    ...ops.map(r => [
+      r.name, r.totalFine > 0 ? '¥'+r.totalFine : '-',
+      r.openTotal, r.openAbnormal, fmtPct(r.openPct), r.openFine > 0 ? '¥'+r.openFine : '-',
+      r.loadTotal, r.loadAbnormal, fmtPct(r.loadPct), r.loadFine > 0 ? '¥'+r.loadFine : '-',
+      r.delivTotal, r.delivAbnormal, fmtPct(r.delivPct), r.delivFine > 0 ? '¥'+r.delivFine : '-',
+      r.confirmTickets, r.confirmFine > 0 ? '¥'+r.confirmFine : '-',
+      r.selfPickup, r.selfPickupFine > 0 ? '¥'+r.selfPickupFine : '-',
+    ])
+  ], { colorCols: { 4: 'red', 8: 'red', 12: 'red' } });
+}
+
+// ============================================================
+//  表格渲染
+// ============================================================
+function renderTable(id, rows, opts = {}) {
+  const table = $(id);
+  table.innerHTML = '';
+  rows.forEach((row, ri) => {
+    const tr = document.createElement('tr');
+    row.forEach((cell, ci) => {
+      const td = document.createElement(ri === 0 ? 'th' : 'td');
+      td.textContent = cell;
+      if (ri > 0 && ci === 0) td.className = 'td-name';
+      if (ri > 0 && opts.colorCols) {
+        const color = opts.colorCols[ci];
+        if (color === 'red' && cell !== '0.0%' && cell !== '-' && cell !== '0%') td.style.color = '#ef4444';
+        if (color === 'green') td.style.color = '#22c55e';
+      }
+      tr.appendChild(td);
+    });
+    table.appendChild(tr);
+  });
+}
+
+// ============================================================
+//  Chart 配置工厂
+// ============================================================
+function baseChartOpts() {
+  return {
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: {
+      legend: { labels: { color: '#8b949e', font: { size: 11 }, boxWidth: 10 } },
+      tooltip: { mode: 'index', intersect: false }
+    },
+    scales: {
+      x: { ticks: { color: '#8b949e', font: { size: 10 }, maxRotation: 35 }, grid: { color: 'rgba(255,255,255,0.04)' } },
+      y: { ticks: { color: '#8b949e', font: { size: 10 } }, grid: { color: 'rgba(255,255,255,0.06)' } }
+    }
+  };
+}
+function chartStackedOpts(yLabel) {
+  const opts = baseChartOpts();
+  opts.scales.x.stacked = true;
+  opts.scales.y.stacked = true;
+  opts.scales.y.max = 100;
+  opts.scales.y.ticks.callback = v => v + '%';
+  return opts;
+}
+function chartBarOpts(yLabel, color) {
+  const opts = baseChartOpts();
+  opts.plugins.legend = { display: false };
+  return opts;
+}
+
+// ============================================================
+//  ★★★ 文件上传处理（上传后自动保存到服务器）★★★
+// ============================================================
+$('fileTimeEffect').addEventListener('change', async e => {
+  const file = e.target.files[0];
+  if (!file) return;
+  showLoading(true);
+  try {
+    const wb = await readExcel(file);
+    STATE.timeEffect = parseTimeEffect(wb);
+    parseTimeDetails(wb);
+    renderAll();
+    // ★ 自动保存到服务器
+    await saveToServer();
+    showToast('时效报表加载成功：' + file.name);
+  } catch(err) {
+    showToast('解析失败：' + err.message, true);
+  }
+  showLoading(false);
+  e.target.value = '';
+});
+
+$('fileOperation').addEventListener('change', async e => {
+  const file = e.target.files[0];
+  if (!file) return;
+  showLoading(true);
+  try {
+    const wb = await readExcel(file);
+    STATE.operation = parseOperation(wb);
+    parseOperationDetails(wb);
+    renderAll();
+    // ★ 自动保存到服务器
+    await saveToServer();
+    showToast('操作规范报表加载成功：' + file.name);
+  } catch(err) {
+    showToast('解析失败：' + err.message, true);
+  }
+  showLoading(false);
+  e.target.value = '';
+});
+
+// ============================================================
+//  内置初始数据（6.1-6.21）— 仅在服务器无数据时使用
+// ============================================================
+function loadDefaultData() {
+  STATE.timeEffect = {
+    dateRange: '6.1-6.21',
+    delivery: [
+      { name:'总计', total:821, over48:23, over48pct:0.0280, over48fine:2300, h24_48:173, h24_48pct:0.2107, h24:476, h24pct:0.5798, abnormal:149 },
+      { name:'佛山鑫勇', total:120, over48:6, over48pct:0.05, over48fine:600, h24_48:20, h24_48pct:0.1667, h24:80, h24pct:0.6667, abnormal:14 },
+      { name:'成都鑫勇', total:103, over48:1, over48pct:0.0097, over48fine:100, h24_48:18, h24_48pct:0.1748, h24:65, h24pct:0.6311, abnormal:19 },
+      { name:'上海曙顺', total:72, over48:0, over48pct:0, over48fine:0, h24_48:20, h24_48pct:0.2778, h24:47, h24pct:0.6528, abnormal:5 },
+      { name:'昆明建鑫', total:48, over48:1, over48pct:0.0208, over48fine:100, h24_48:16, h24_48pct:0.3333, h24:18, h24pct:0.375, abnormal:13 },
+      { name:'杭州鑫勇', total:47, over48:0, over48pct:0, over48fine:0, h24_48:12, h24_48pct:0.2553, h24:33, h24pct:0.7021, abnormal:2 },
+      { name:'北京鑫勇', total:69, over48:0, over48pct:0, over48fine:0, h24_48:5, h24_48pct:0.0725, h24:61, h24pct:0.8841, abnormal:3 },
+      { name:'重庆鑫勇', total:65, over48:2, over48pct:0.0308, over48fine:200, h24_48:10, h24_48pct:0.1538, h24:24, h24pct:0.3692, abnormal:29 },
+      { name:'武汉洪山区', total:68, over48:7, over48pct:0.1029, over48fine:700, h24_48:17, h24_48pct:0.25, h24:33, h24pct:0.4853, abnormal:11 },
+      { name:'南昌鑫勇', total:41, over48:2, over48pct:0.0488, over48fine:200, h24_48:9, h24_48pct:0.2195, h24:15, h24pct:0.3659, abnormal:15 },
+      { name:'深圳鑫勇', total:24, over48:0, over48pct:0, over48fine:0, h24_48:4, h24_48pct:0.1667, h24:13, h24pct:0.5417, abnormal:7 },
+      { name:'西安鑫创源', total:42, over48:2, over48pct:0.0476, over48fine:200, h24_48:8, h24_48pct:0.1905, h24:25, h24pct:0.5952, abnormal:7 },
+      { name:'福州鑫勇', total:13, over48:0, over48pct:0, over48fine:0, h24_48:7, h24_48pct:0.5385, h24:1, h24pct:0.0769, abnormal:5 },
+      { name:'南京鑫创源', total:21, over48:0, over48pct:0, over48fine:0, h24_48:1, h24_48pct:0.0476, h24:16, h24pct:0.7619, abnormal:4 },
+      { name:'长沙鑫勇', total:19, over48:0, over48pct:0, over48fine:0, h24_48:2, h24_48pct:0.1053, h24:17, h24pct:0.8947, abnormal:0 },
+      { name:'贵阳新鑫勇', total:37, over48:0, over48pct:0, over48fine:0, h24_48:12, h24_48pct:0.3243, h24:14, h24pct:0.3784, abnormal:11 },
+      { name:'合肥鑫勇', total:8, over48:2, over48pct:0.25, over48fine:200, h24_48:0, h24_48pct:0, h24:4, h24pct:0.5, abnormal:2 },
+      { name:'南宁鑫勇', total:17, over48:0, over48pct:0, over48fine:0, h24_48:9, h24_48pct:0.5294, h24:6, h24pct:0.3529, abnormal:2 },
+      { name:'济南鑫勇', total:7, over48:0, over48pct:0, over48fine:0, h24_48:3, h24_48pct:0.4286, h24:4, h24pct:0.5714, abnormal:0 },
+      { name:'海南鑫勇盛', total:2, over48:0, over48pct:0, over48fine:0, h24_48:1, h24_48pct:0.5, h24:0, h24pct:0, abnormal:1 },
+      { name:'郑州鑫勇', total:0, over48:0, over48pct:0, over48fine:0, h24_48:0, h24_48pct:0, h24:0, h24pct:0, abnormal:0 },
+    ],
+    transfer: [
+      { name:'总计', total:1952, over48:59, over48pct:0.0302, over48fine:5900, h24_48:340, h24_48pct:0.1742, h24:1414, h24pct:0.7244, abnormal:139 },
+      { name:'佛山鑫勇', total:703, over48:22, over48pct:0.0313, over48fine:2200, h24_48:120, h24_48pct:0.1707, h24:546, h24pct:0.7767, abnormal:15 },
+      { name:'南宁鑫勇', total:115, over48:0, over48pct:0, over48fine:0, h24_48:35, h24_48pct:0.3043, h24:50, h24pct:0.4348, abnormal:30 },
+      { name:'杭州鑫勇', total:164, over48:1, over48pct:0.0061, over48fine:100, h24_48:24, h24_48pct:0.1463, h24:129, h24pct:0.7866, abnormal:10 },
+      { name:'北京鑫勇', total:120, over48:0, over48pct:0, over48fine:0, h24_48:1, h24_48pct:0.0083, h24:117, h24pct:0.975, abnormal:2 },
+      { name:'西安鑫创源', total:88, over48:0, over48pct:0, over48fine:0, h24_48:6, h24_48pct:0.0682, h24:75, h24pct:0.8523, abnormal:7 },
+      { name:'武汉洪山区', total:99, over48:11, over48pct:0.1111, over48fine:1100, h24_48:19, h24_48pct:0.1919, h24:66, h24pct:0.6667, abnormal:3 },
+      { name:'上海曙顺', total:104, over48:11, over48pct:0.1058, over48fine:1100, h24_48:26, h24_48pct:0.25, h24:59, h24pct:0.5673, abnormal:8 },
+      { name:'昆明建鑫', total:83, over48:1, over48pct:0.0120, over48fine:100, h24_48:18, h24_48pct:0.2169, h24:43, h24pct:0.5181, abnormal:21 },
+      { name:'贵阳新鑫勇', total:91, over48:7, over48pct:0.0769, over48fine:700, h24_48:22, h24_48pct:0.2418, h24:42, h24pct:0.4615, abnormal:20 },
+      { name:'郑州鑫勇', total:78, over48:0, over48pct:0, over48fine:0, h24_48:22, h24_48pct:0.2821, h24:56, h24pct:0.7179, abnormal:0 },
+      { name:'南京鑫创源', total:48, over48:0, over48pct:0, over48fine:0, h24_48:2, h24_48pct:0.0417, h24:46, h24pct:0.9583, abnormal:0 },
+      { name:'南昌鑫勇', total:48, over48:1, over48pct:0.0208, over48fine:100, h24_48:4, h24_48pct:0.0833, h24:38, h24pct:0.7917, abnormal:5 },
+      { name:'合肥鑫勇', total:39, over48:2, over48pct:0.0513, over48fine:200, h24_48:5, h24_48pct:0.1282, h24:27, h24pct:0.6923, abnormal:5 },
+      { name:'重庆鑫勇', total:33, over48:0, over48pct:0, over48fine:0, h24_48:5, h24_48pct:0.1515, h24:24, h24pct:0.7273, abnormal:4 },
+      { name:'成都鑫勇', total:54, over48:2, over48pct:0.037, over48fine:200, h24_48:9, h24_48pct:0.1667, h24:40, h24pct:0.7407, abnormal:3 },
+      { name:'长沙鑫勇', total:31, over48:0, over48pct:0, over48fine:0, h24_48:0, h24_48pct:0, h24:31, h24pct:1, abnormal:0 },
+      { name:'深圳鑫勇', total:37, over48:1, over48pct:0.027, over48fine:100, h24_48:16, h24_48pct:0.4324, h24:14, h24pct:0.3784, abnormal:6 },
+      { name:'福州鑫勇', total:11, over48:0, over48pct:0, over48fine:0, h24_48:2, h24_48pct:0.1818, h24:9, h24pct:0.8182, abnormal:0 },
+      { name:'海南鑫勇盛', total:6, over48:0, over48pct:0, over48fine:0, h24_48:4, h24_48pct:0.6667, h24:2, h24pct:0.3333, abnormal:0 },
+    ]
+  };
+
+  STATE.details = {
+    deliveryOver48: [
+      {id:'102315819',station:'重庆鑫勇'}, {id:'11094678',station:'昆明建鑫'}, {id:'102315978',station:'武汉洪山区'},
+      {id:'102316016',station:'合肥鑫勇'}, {id:'11392422',station:'佛山鑫勇'}, {id:'102316268',station:'西安鑫创源'},
+      {id:'102316505',station:'合肥鑫勇'}, {id:'102316528',station:'西安鑫创源'}, {id:'102316691',station:'武汉洪山区'},
+      {id:'10391632',station:'武汉洪山区'}, {id:'10391725',station:'南昌鑫勇'}, {id:'102317815',station:'南昌鑫勇'},
+      {id:'102318276',station:'武汉洪山区'}, {id:'102318160',station:'武汉洪山区'}, {id:'102318241',station:'武汉洪山区'},
+      {id:'10761069',station:'武汉洪山区'}, {id:'102318446',station:'成都鑫勇'}, {id:'33103577',station:'重庆鑫勇'},
+      {id:'99731521',station:'佛山鑫勇'}, {id:'30535004',station:'佛山鑫勇'}, {id:'12941511',station:'佛山鑫勇'},
+      {id:'11095008',station:'佛山鑫勇'}, {id:'11265585',station:'佛山鑫勇'},
+    ],
+    transferOver48: [
+      {id:'11392121',station:'贵阳新鑫勇'}, {id:'102315582',station:'贵阳新鑫勇'}, {id:'11392226',station:'贵阳新鑫勇'},
+      {id:'11392307',station:'贵阳新鑫勇'}, {id:'11392317',station:'贵阳新鑫勇'}, {id:'11392318',station:'贵阳新鑫勇'},
+      {id:'10185933',station:'昆明建鑫'}, {id:'33202294',station:'武汉洪山区'}, {id:'102316400',station:'武汉洪山区'},
+      {id:'102316427',station:'南昌鑫勇'}, {id:'33202296',station:'武汉洪山区'}, {id:'102316901',station:'武汉洪山区'},
+      {id:'11095134',station:'合肥鑫勇'}, {id:'11392934',station:'贵阳新鑫勇'}, {id:'13307445',station:'上海曙顺'},
+      {id:'102317981',station:'合肥鑫勇'}, {id:'102318054',station:'武汉洪山区'}, {id:'102318070',station:'武汉洪山区'},
+      {id:'102318803',station:'成都鑫勇'}, {id:'11393750',station:'成都鑫勇'}, {id:'13307386',station:'上海曙顺'},
+      {id:'13307389',station:'上海曙顺'}, {id:'99731490',station:'佛山鑫勇'}, {id:'33202266',station:'武汉洪山区'},
+      {id:'33202275',station:'武汉洪山区'}, {id:'102316559',station:'杭州鑫勇'}, {id:'13307424',station:'上海曙顺'},
+      {id:'99731700',station:'佛山鑫勇'}, {id:'33202312',station:'武汉洪山区'}, {id:'10186156',station:'佛山鑫勇'},
+      {id:'13307447',station:'上海曙顺'}, {id:'10186205',station:'佛山鑫勇'}, {id:'33202341',station:'武汉洪山区'},
+      {id:'10186249',station:'佛山鑫勇'}, {id:'33202344',station:'武汉洪山区'}, {id:'10186252',station:'佛山鑫勇'},
+      {id:'10186318',station:'佛山鑫勇'}, {id:'11265469',station:'佛山鑫勇'}, {id:'13307475',station:'上海曙顺'},
+      {id:'12319679',station:'深圳鑫勇'}, {id:'13307486',station:'上海曙顺'}, {id:'11132813',station:'佛山鑫勇'},
+      {id:'11757034',station:'佛山鑫勇'}, {id:'11132835',station:'佛山鑫勇'}, {id:'30535508',station:'佛山鑫勇'},
+      {id:'11757106',station:'佛山鑫勇'}, {id:'33401519',station:'佛山鑫勇'}, {id:'11757179',station:'佛山鑫勇'},
+      {id:'33401520',station:'佛山鑫勇'}, {id:'13307497',station:'上海曙顺'}, {id:'11393693',station:'佛山鑫勇'},
+      {id:'11096049',station:'佛山鑫勇'}, {id:'11096070',station:'佛山鑫勇'}, {id:'12942004',station:'佛山鑫勇'},
+      {id:'12942007',station:'佛山鑫勇'}, {id:'13307510',station:'上海曙顺'}, {id:'13307512',station:'上海曙顺'},
+      {id:'12942013',station:'佛山鑫勇'}, {id:'13307514',station:'上海曙顺'},
+    ],
+    signAbnormal: [
+      {id:'11391804',station:'南宁鑫勇'}, {id:'102314471',station:'南京鑫创源'}, {id:'10635197',station:'武汉洪山区'},
+      {id:'10635256',station:'武汉洪山区'}, {id:'10635288',station:'武汉洪山区'}, {id:'10760652',station:'武汉洪山区'},
+      {id:'32605813',station:'武汉洪山区'}, {id:'32605816',station:'武汉洪山区'}, {id:'33401378',station:'长沙鑫勇'},
+      {id:'102314815',station:'长沙鑫勇'}, {id:'10185850',station:'长沙鑫勇'}, {id:'10391172',station:'武汉洪山区'},
+      {id:'10635193',station:'长沙鑫勇'}, {id:'10635254',station:'武汉洪山区'}, {id:'10635255',station:'长沙鑫勇'},
+      {id:'10635284',station:'武汉洪山区'}, {id:'10635289',station:'长沙鑫勇'}, {id:'10635290',station:'长沙鑫勇'},
+      {id:'10635300',station:'长沙鑫勇'}, {id:'10635305',station:'长沙鑫勇'}, {id:'10635308',station:'长沙鑫勇'},
+      {id:'10635312',station:'长沙鑫勇'}, {id:'10635313',station:'长沙鑫勇'}, {id:'10635412',station:'长沙鑫勇'},
+      {id:'10635413',station:'长沙鑫勇'}, {id:'10635459',station:'长沙鑫勇'}, {id:'10760726',station:'武汉洪山区'},
+      {id:'10760817',station:'长沙鑫勇'}, {id:'11094425',station:'北京鑫勇'}, {id:'102314827',station:'武汉洪山区'},
+      {id:'102315075',station:'武汉洪山区'}, {id:'102315076',station:'武汉洪山区'}, {id:'102315086',station:'武汉洪山区'},
+      {id:'102315240',station:'武汉洪山区'}, {id:'102315452',station:'武汉洪山区'}, {id:'102315454',station:'武汉洪山区'},
+      {id:'102315976',station:'武汉洪山区'}, {id:'10760825',station:'武汉洪山区'}, {id:'11094306',station:'成都鑫勇'},
+      {id:'11094458',station:'上海曙顺'}, {id:'11094611',station:'长沙鑫勇'}, {id:'11094616',station:'上海曙顺'},
+      {id:'11392493',station:'成都鑫勇'}, {id:'11392615',station:'成都鑫勇'}, {id:'11756120',station:'北京鑫勇'},
+      {id:'11756451',station:'上海曙顺'}, {id:'99731323',station:'长沙鑫勇'}, {id:'102314837',station:'合肥鑫勇'},
+      {id:'102315239',station:'武汉洪山区'}, {id:'102315808',station:'成都鑫勇'}, {id:'102315973',station:'武汉洪山区'},
+      {id:'102315975',station:'武汉洪山区'}, {id:'102315977',station:'武汉洪山区'}, {id:'102315980',station:'武汉洪山区'},
+      {id:'102316007',station:'成都鑫勇'}, {id:'102315932',station:'贵阳新鑫勇'}, {id:'10391509',station:'北京鑫勇'},
+      {id:'10635482',station:'武汉洪山区'}, {id:'10635511',station:'武汉洪山区'}, {id:'10760853',station:'武汉洪山区'},
+      {id:'11094941',station:'合肥鑫勇'}, {id:'12941623',station:'合肥鑫勇'}, {id:'33202303',station:'武汉洪山区'},
+      {id:'33401415',station:'合肥鑫勇'}, {id:'102315087',station:'武汉洪山区'}, {id:'102316262',station:'武汉洪山区'},
+      {id:'102316263',station:'武汉洪山区'}, {id:'102316264',station:'武汉洪山区'}, {id:'102316505',station:'合肥鑫勇'},
+      {id:'102316691',station:'武汉洪山区'}, {id:'10391632',station:'武汉洪山区'}, {id:'10635559',station:'武汉洪山区'},
+      {id:'10635566',station:'武汉洪山区'}, {id:'10760857',station:'昆明建鑫'}, {id:'11095166',station:'昆明建鑫'},
+      {id:'11095175',station:'武汉洪山区'}, {id:'11095220',station:'武汉洪山区'}, {id:'11095388',station:'昆明建鑫'},
+      {id:'12941756',station:'成都鑫勇'}, {id:'102317044',station:'武汉洪山区'}, {id:'102317178',station:'武汉洪山区'},
+      {id:'102317443',station:'武汉洪山区'}, {id:'102317446',station:'武汉洪山区'}, {id:'102317492',station:'昆明建鑫'},
+      {id:'102317548',station:'武汉洪山区'}, {id:'102317392',station:'武汉洪山区'}, {id:'102317534',station:'武汉洪山区'},
+      {id:'102317796',station:'武汉洪山区'}, {id:'99731874',station:'杭州鑫勇'}, {id:'10761040',station:'南宁鑫勇'},
+      {id:'32606121',station:'武汉洪山区'}, {id:'32606122',station:'武汉洪山区'}, {id:'102318044',station:'武汉洪山区'},
+      {id:'102318275',station:'贵阳新鑫勇'}, {id:'10391904',station:'武汉洪山区'}, {id:'10391938',station:'武汉洪山区'},
+      {id:'10392075',station:'武汉洪山区'}, {id:'102319179',station:'北京鑫勇'},
+    ],
+    confirmDelay: [
+      {id:'12941553',station:'合肥鑫勇'}, {id:'10760852',station:'合肥鑫勇'}, {id:'10760880',station:'合肥鑫勇'},
+      {id:'102316834',station:'合肥鑫勇'}, {id:'102317784',station:'杭州鑫勇'}, {id:'102317842',station:'杭州鑫勇'},
+      {id:'102317852',station:'杭州鑫勇'}, {id:'102317825',station:'杭州鑫勇'}, {id:'102317701',station:'杭州鑫勇'},
+      {id:'102317862',station:'杭州鑫勇'}, {id:'102317875',station:'杭州鑫勇'}, {id:'102317861',station:'杭州鑫勇'},
+      {id:'102317890',station:'杭州鑫勇'}, {id:'102317870',station:'杭州鑫勇'}, {id:'102317919',station:'杭州鑫勇'},
+      {id:'102317997',station:'杭州鑫勇'}, {id:'102317944',station:'杭州鑫勇'}, {id:'102317873',station:'杭州鑫勇'},
+      {id:'102317958',station:'杭州鑫勇'}, {id:'102317967',station:'杭州鑫勇'}, {id:'102317915',station:'杭州鑫勇'},
+      {id:'102317821',station:'杭州鑫勇'}, {id:'102318069',station:'杭州鑫勇'}, {id:'102318092',station:'杭州鑫勇'},
+    ],
+    complain: [
+      {id:'11756221',station:'南昌鑫勇'},
+    ],
+  };
+  STATE.operation = {
+    complainCount: 1,
+    ops: [
+      { name:'合计', totalFine:416, openTotal:17733, openAbnormal:26, openPct:0.001466, openFine:52, loadTotal:2894, loadAbnormal:24, loadPct:0.008293, loadFine:120, delivTotal:947, delivAbnormal:98, delivPct:0.10348, delivFine:196, confirmTickets:24, confirmFine:48, selfPickup:'-', selfPickupFine:0 },
+      { name:'佛山鑫勇', totalFine:33, openTotal:3927, openAbnormal:9, openPct:0.002292, openFine:18, loadTotal:603, loadAbnormal:3, loadPct:0.004975, loadFine:15, delivTotal:49, delivAbnormal:0, delivPct:0, delivFine:0, confirmTickets:0, confirmFine:0, selfPickup:'及时', selfPickupFine:0 },
+      { name:'昆明建鑫', totalFine:27, openTotal:805, openAbnormal:2, openPct:0.002484, openFine:4, loadTotal:81, loadAbnormal:3, loadPct:0.037037, loadFine:15, delivTotal:60, delivAbnormal:4, delivPct:0.0667, delivFine:8, confirmTickets:0, confirmFine:0, selfPickup:'及时', selfPickupFine:0 },
+      { name:'武汉洪山区', totalFine:104, openTotal:816, openAbnormal:0, openPct:0, openFine:0, loadTotal:71, loadAbnormal:0, loadPct:0, loadFine:0, delivTotal:87, delivAbnormal:52, delivPct:0.5977, delivFine:104, confirmTickets:0, confirmFine:0, selfPickup:'及时', selfPickupFine:0 },
+      { name:'合肥鑫勇', totalFine:18, openTotal:250, openAbnormal:0, openPct:0, openFine:0, loadTotal:24, loadAbnormal:0, loadPct:0, loadFine:0, delivTotal:9, delivAbnormal:5, delivPct:0.5556, delivFine:10, confirmTickets:4, confirmFine:8, selfPickup:'及时', selfPickupFine:0 },
+      { name:'成都鑫勇', totalFine:14, openTotal:779, openAbnormal:1, openPct:0.001284, openFine:2, loadTotal:65, loadAbnormal:0, loadPct:0, loadFine:0, delivTotal:126, delivAbnormal:6, delivPct:0.0476, delivFine:12, confirmTickets:0, confirmFine:0, selfPickup:'及时', selfPickupFine:0 },
+      { name:'南京鑫创源', totalFine:2, openTotal:328, openAbnormal:0, openPct:0, openFine:0, loadTotal:52, loadAbnormal:0, loadPct:0, loadFine:0, delivTotal:31, delivAbnormal:1, delivPct:0.0323, delivFine:2, confirmTickets:0, confirmFine:0, selfPickup:'及时', selfPickupFine:0 },
+      { name:'上海曙顺', totalFine:15, openTotal:699, openAbnormal:2, openPct:0.002861, openFine:4, loadTotal:89, loadAbnormal:1, loadPct:0.01124, loadFine:5, delivTotal:74, delivAbnormal:3, delivPct:0.0405, delivFine:6, confirmTickets:0, confirmFine:0, selfPickup:'及时', selfPickupFine:0 },
+      { name:'贵阳新鑫勇', totalFine:10, openTotal:233, openAbnormal:3, openPct:0.01288, openFine:6, loadTotal:56, loadAbnormal:0, loadPct:0, loadFine:0, delivTotal:57, delivAbnormal:2, delivPct:0.0351, delivFine:4, confirmTickets:0, confirmFine:0, selfPickup:'及时', selfPickupFine:0 },
+      { name:'江门鑫源', totalFine:17, openTotal:713, openAbnormal:1, openPct:0.00140, openFine:2, loadTotal:182, loadAbnormal:3, loadPct:0.01648, loadFine:15, delivTotal:0, delivAbnormal:0, delivPct:0, delivFine:0, confirmTickets:0, confirmFine:0, selfPickup:'-', selfPickupFine:0 },
+      { name:'重庆鑫勇', totalFine:4, openTotal:1738, openAbnormal:2, openPct:0.001151, openFine:4, loadTotal:173, loadAbnormal:0, loadPct:0, loadFine:0, delivTotal:80, delivAbnormal:0, delivPct:0, delivFine:0, confirmTickets:0, confirmFine:0, selfPickup:'及时', selfPickupFine:0 },
+      { name:'深圳鑫勇', totalFine:5, openTotal:430, openAbnormal:0, openPct:0, openFine:0, loadTotal:128, loadAbnormal:1, loadPct:0.0078, loadFine:5, delivTotal:32, delivAbnormal:0, delivPct:0, delivFine:0, confirmTickets:0, confirmFine:0, selfPickup:'及时', selfPickupFine:0 },
+      { name:'北海鑫勇', totalFine:2, openTotal:1012, openAbnormal:1, openPct:0.000988, openFine:2, loadTotal:125, loadAbnormal:0, loadPct:0, loadFine:0, delivTotal:0, delivAbnormal:0, delivPct:0, delivFine:0, confirmTickets:0, confirmFine:0, selfPickup:'-', selfPickupFine:0 },
+      { name:'南宁鑫勇', totalFine:37, openTotal:1737, openAbnormal:4, openPct:0.002303, openFine:8, loadTotal:447, loadAbnormal:5, loadPct:0.011186, loadFine:25, delivTotal:23, delivAbnormal:2, delivPct:0.087, delivFine:4, confirmTickets:0, confirmFine:0, selfPickup:'及时', selfPickupFine:0 },
+      { name:'南昌鑫勇', totalFine:5, openTotal:1345, openAbnormal:0, openPct:0, openFine:0, loadTotal:207, loadAbnormal:1, loadPct:0.00483, loadFine:5, delivTotal:56, delivAbnormal:0, delivPct:0, delivFine:0, confirmTickets:0, confirmFine:0, selfPickup:'及时', selfPickupFine:0 },
+      { name:'长沙鑫勇', totalFine:61, openTotal:424, openAbnormal:0, openPct:0, openFine:0, loadTotal:42, loadAbnormal:5, loadPct:0.119, loadFine:25, delivTotal:38, delivAbnormal:18, delivPct:0.4737, delivFine:36, confirmTickets:0, confirmFine:0, selfPickup:'及时', selfPickupFine:0 },
+      { name:'郑州鑫勇', totalFine:0, openTotal:397, openAbnormal:0, openPct:0, openFine:0, loadTotal:50, loadAbnormal:0, loadPct:0, loadFine:0, delivTotal:0, delivAbnormal:0, delivPct:0, delivFine:0, confirmTickets:0, confirmFine:0, selfPickup:'及时', selfPickupFine:0 },
+      { name:'济南鑫勇', totalFine:5, openTotal:951, openAbnormal:0, openPct:0, openFine:0, loadTotal:21, loadAbnormal:1, loadPct:0.04762, loadFine:5, delivTotal:12, delivAbnormal:0, delivPct:0, delivFine:0, confirmTickets:0, confirmFine:0, selfPickup:'-', selfPickupFine:0 },
+      { name:'北京鑫勇', totalFine:8, openTotal:177, openAbnormal:0, openPct:0, openFine:0, loadTotal:149, loadAbnormal:0, loadPct:0, loadFine:0, delivTotal:88, delivAbnormal:4, delivPct:0.04545, delivFine:8, confirmTickets:0, confirmFine:0, selfPickup:'及时', selfPickupFine:0 },
+      { name:'福州鑫勇', totalFine:0, openTotal:150, openAbnormal:0, openPct:0, openFine:0, loadTotal:35, loadAbnormal:0, loadPct:0, loadFine:0, delivTotal:18, delivAbnormal:0, delivPct:0, delivFine:0, confirmTickets:0, confirmFine:0, selfPickup:'及时', selfPickupFine:0 },
+      { name:'无锡曙顺', totalFine:5, openTotal:129, openAbnormal:0, openPct:0, openFine:0, loadTotal:17, loadAbnormal:1, loadPct:0.05882, loadFine:5, delivTotal:0, delivAbnormal:0, delivPct:0, delivFine:0, confirmTickets:0, confirmFine:0, selfPickup:'-', selfPickupFine:0 },
+      { name:'海南鑫勇盛', totalFine:2, openTotal:146, openAbnormal:1, openPct:0.00685, openFine:2, loadTotal:64, loadAbnormal:0, loadPct:0, loadFine:0, delivTotal:2, delivAbnormal:0, delivPct:0, delivFine:0, confirmTickets:0, confirmFine:0, selfPickup:'及时', selfPickupFine:0 },
+      { name:'杭州鑫勇', totalFine:42, openTotal:159, openAbnormal:0, openPct:0, openFine:0, loadTotal:139, loadAbnormal:0, loadPct:0, loadFine:0, delivTotal:56, delivAbnormal:1, delivPct:0.0179, delivFine:2, confirmTickets:20, confirmFine:40, selfPickup:'及时', selfPickupFine:0 },
+      { name:'天津鑫勇', totalFine:0, openTotal:215, openAbnormal:0, openPct:0, openFine:0, loadTotal:50, loadAbnormal:0, loadPct:0, loadFine:0, delivTotal:0, delivAbnormal:0, delivPct:0, delivFine:0, confirmTickets:0, confirmFine:0, selfPickup:'-', selfPickupFine:0 },
+      { name:'西安鑫创源', totalFine:0, openTotal:145, openAbnormal:0, openPct:0, openFine:0, loadTotal:17, loadAbnormal:0, loadPct:0, loadFine:0, delivTotal:49, delivAbnormal:0, delivPct:0, delivFine:0, confirmTickets:0, confirmFine:0, selfPickup:'及时', selfPickupFine:0 },
+      { name:'鹰潭鑫勇', totalFine:0, openTotal:28, openAbnormal:0, openPct:0, openFine:0, loadTotal:7, loadAbnormal:0, loadPct:0, loadFine:0, delivTotal:0, delivAbnormal:0, delivPct:0, delivFine:0, confirmTickets:0, confirmFine:0, selfPickup:'-', selfPickupFine:0 },
+    ]
+  };
+
+  renderAll();
+}
+
+// ============================================================
+//  ★★★ 页面初始化：优先服务器 → 其次本地缓存 → 最后内置数据 ★★★
+// ============================================================
+async function init() {
+  showLoading(true);
+  const hasData = await fetchServerData();
+  if (hasData && (STATE.timeEffect || STATE.operation)) {
+    // 有数据（来自服务器或本地缓存），直接使用
+    renderAll();
+  } else {
+    // 无任何数据，使用内置默认数据，并保存到本地
+    loadDefaultData();
+    STATE.updatedAt = new Date().toISOString();
+    saveToLocal();
+    // 尝试保存到服务器（如果服务器可用）
+    try {
+      await saveToServer();
+    } catch (err) { /* 忽略 */ }
+  }
+  showLoading(false);
+}
+
+init();
+
+// ============================================================
+//  明细弹窗功能
+// ============================================================
+function showDetailModal(title, detailKey) {
+  const overlay = $('detailModal');
+  const list = STATE.details[detailKey] || [];
+  
+  $('modalTitle').textContent = title + ' 明细';
+  $('modalCount').textContent = `共 ${list.length} 条记录`;
+  
+  let html = '<table class="modal-table"><thead><tr><th>序号</th><th>单号</th><th>网点</th></tr></thead><tbody>';
+  list.forEach((item, i) => {
+    html += `<tr><td>${i + 1}</td><td>${item.id}</td><td>${item.station}</td></tr>`;
+  });
+  html += '</tbody></table>';
+  
+  $('modalTableWrap').innerHTML = html;
+  overlay.classList.add('active');
+}
+
+// 关闭弹窗
+$('modalClose').addEventListener('click', () => $('detailModal').classList.remove('active'));
+$('detailModal').addEventListener('click', e => { if (e.target === $('detailModal')) $('detailModal').classList.remove('active'); });
+
+</script>
+</body>
+</html>

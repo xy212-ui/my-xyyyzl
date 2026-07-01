@@ -6,8 +6,7 @@
   <title>鑫源供应链 · 运营品质看板</title>
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
-  <!-- ★★★ Supabase JS SDK ★★★ -->
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+  <!-- ★★★ Supabase REST API 直接调用（兼容新版 sb_publishable_ key）★★★ -->
   <style>
     :root {
       --bg: #0d1117;
@@ -446,17 +445,7 @@
 
 <script>
 // ============================================================
-//  ★★★ Supabase 初始化 ★★★
-//  【重要】请将下面的 URL 和 ANON_KEY 替换为你自己的 Supabase 项目信息
-//  获取方式：登录 supabase.com → 你的项目 → Settings → API → 复制 Project URL 和 anon public key
-// ============================================================
-const SUPABASE_URL = 'https://qagilmopsjlbudgcpmbn.supabase.co';
-const SUPABASE_ANON_KEY = 'sb_publishable_BLKEFYFF5wduEPm9aMNgUQ_jXAAZCyd';
-
-const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-
-// ============================================================
-//  工具函数（完全不变）
+//  工具函数
 // ============================================================
 const $ = id => document.getElementById(id);
 let charts = {};
@@ -477,7 +466,7 @@ function fmtPct(v) {
 function destroyChart(id) { if (charts[id]) { charts[id].destroy(); delete charts[id]; } }
 
 // ============================================================
-//  格式化更新时间（完全不变）
+//  格式化更新时间
 // ============================================================
 function formatTime(iso) {
   if (!iso) return '--';
@@ -490,7 +479,7 @@ function formatTime(iso) {
 }
 
 // ============================================================
-//  Tab 切换（完全不变）
+//  Tab 切换
 // ============================================================
 document.querySelectorAll('.tab').forEach(tab => {
   tab.addEventListener('click', () => {
@@ -502,7 +491,7 @@ document.querySelectorAll('.tab').forEach(tab => {
 });
 
 // ============================================================
-//  读取 Excel（完全不变）
+//  读取 Excel
 // ============================================================
 function readExcel(file) {
   return new Promise((res, rej) => {
@@ -523,7 +512,7 @@ function sheetToRows(ws) {
 }
 
 // ============================================================
-//  解析时效报表（完全不变）
+//  解析时效报表
 // ============================================================
 function parseTimeEffect(wb) {
   const data = {};
@@ -580,7 +569,7 @@ function parseTimeEffect(wb) {
 }
 
 // ============================================================
-//  解析操作规范报表（完全不变）
+//  解析操作规范报表
 // ============================================================
 function parseOperation(wb) {
   const data = {};
@@ -628,7 +617,7 @@ function parseOperation(wb) {
 }
 
 // ============================================================
-//  解析时效报表的明细sheet（完全不变）
+//  解析时效报表的明细sheet
 // ============================================================
 function parseTimeDetails(wb) {
   const s1 = wb.SheetNames.find(n => n.includes('超48小时送货明细') || n.includes('超48h送货明细'));
@@ -645,7 +634,7 @@ function parseTimeDetails(wb) {
 }
 
 // ============================================================
-//  解析操作规范报表的明细sheet（完全不变）
+//  解析操作规范报表的明细sheet
 // ============================================================
 function parseOperationDetails(wb) {
   const s1 = wb.SheetNames.find(n => n.includes('签收异常明细'));
@@ -668,7 +657,7 @@ function parseOperationDetails(wb) {
 }
 
 // ============================================================
-//  全局数据状态（完全不变）
+//  全局数据状态
 // ============================================================
 let STATE = {
   timeEffect: null,
@@ -683,42 +672,55 @@ let STATE = {
 };
 
 // ============================================================
-//  ★★★ Supabase 云端数据同步 ★★★
-//  替换原来的 fetch('/api/data') 方案
+//  ★★★ Supabase REST API 直接调用 ★★★
+//  兼容新版 sb_publishable_ / sb_secret_ key 格式
+//  不依赖 supabase-js SDK，直接用 fetch() 调用 PostgREST
 // ============================================================
+const SUPABASE_URL = 'https://qagilmopsjlbudgcpmbn.supabase.co';
+const SUPABASE_ANON_KEY = 'sb_publishable_BLKEFYFF5wduEPm9aMNgUQ_jXAAZCyd';
 
-// Supabase 表名
 const TABLE_NAME = 'dashboard_data';
+const REST_BASE = `${SUPABASE_URL}/rest/v1/${TABLE_NAME}`;
+
+// 通用 Supabase REST API 请求头
+function supabaseHeaders() {
+  return {
+    'apikey': SUPABASE_ANON_KEY,
+    'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+    'Content-Type': 'application/json',
+    'Prefer': 'return=representation',
+  };
+}
 
 // 从 Supabase 获取最新数据
 async function fetchServerData() {
   // 1. 尝试从 Supabase 获取
   try {
-    const { data, error } = await supabase
-      .from(TABLE_NAME)
-      .select('*')
-      .order('updated_at', { ascending: false })
-      .limit(1)
-      .single();
+    const resp = await fetch(REST_BASE + '?order=updated_at.desc&limit=1', {
+      headers: supabaseHeaders(),
+    });
 
-    if (!error && data) {
-      // Supabase 返回的字段名，映射到 STATE
-      if (data.time_effect) STATE.timeEffect = data.time_effect;
-      if (data.operation) STATE.operation = data.operation;
-      if (data.details) STATE.details = data.details;
-      if (data.updated_at) {
-        $('updatedAt').textContent = '更新时间：' + formatTime(data.updated_at);
+    if (resp.ok) {
+      const rows = await resp.json();
+      if (rows && rows.length > 0) {
+        const data = rows[0];
+        // Supabase 返回的字段名，映射到 STATE
+        if (data.time_effect) STATE.timeEffect = data.time_effect;
+        if (data.operation) STATE.operation = data.operation;
+        if (data.details) STATE.details = data.details;
+        if (data.updated_at) {
+          $('updatedAt').textContent = '更新时间：' + formatTime(data.updated_at);
+        }
+        // 同步缓存到 localStorage
+        saveToLocal();
+        $('syncBar').style.background = 'rgba(34,197,94,0.08)';
+        $('syncBar').style.borderColor = 'rgba(34,197,94,0.2)';
+        $('syncHint').textContent = '✅ 数据来自 Supabase 云端，全员可见';
+        return true;
       }
-      // 同步缓存到 localStorage
-      saveToLocal();
-      $('syncBar').style.background = 'rgba(34,197,94,0.08)';
-      $('syncBar').style.borderColor = 'rgba(34,197,94,0.2)';
-      $('syncHint').textContent = '✅ 数据来自 Supabase 云端，全员可见';
-      return true;
-    }
-    // 如果是 "No rows found" 错误（PGRST116），说明表空，继续往下走
-    if (error && error.code !== 'PGRST116') {
-      console.warn('Supabase 查询出错:', error.message);
+      // 表空（返回空数组），继续往下走
+    } else {
+      console.warn('Supabase 查询出错:', resp.status, resp.statusText);
     }
   } catch (err) {
     console.warn('Supabase 不可达，尝试本地缓存:', err);
@@ -762,7 +764,7 @@ function saveToLocal() {
   }
 }
 
-// 保存数据到 Supabase
+// 保存数据到 Supabase（REST API 直接调用）
 async function saveToServer() {
   // 先保存到 localStorage（确保本地也有）
   STATE.updatedAt = new Date().toISOString();
@@ -778,26 +780,39 @@ async function saveToServer() {
       updated_at: STATE.updatedAt,
     };
 
-    // 使用 upsert：如果已有 id=1 的记录就更新，否则插入
     // 先查一下有没有已有记录
-    const { data: existing } = await supabase
-      .from(TABLE_NAME)
-      .select('id')
-      .limit(1);
+    const checkResp = await fetch(REST_BASE + '?select=id&limit=1', {
+      headers: supabaseHeaders(),
+    });
 
-    if (existing && existing.length > 0) {
+    let existingId = null;
+    if (checkResp.ok) {
+      const existing = await checkResp.json();
+      if (existing && existing.length > 0) {
+        existingId = existing[0].id;
+      }
+    }
+
+    let saveResp;
+    if (existingId) {
       // 更新已有记录
-      const { error } = await supabase
-        .from(TABLE_NAME)
-        .update(payload)
-        .eq('id', existing[0].id);
-      if (error) throw error;
+      saveResp = await fetch(REST_BASE + '?id=eq.' + existingId, {
+        method: 'PATCH',
+        headers: supabaseHeaders(),
+        body: JSON.stringify(payload),
+      });
     } else {
       // 插入新记录
-      const { error } = await supabase
-        .from(TABLE_NAME)
-        .insert(payload);
-      if (error) throw error;
+      saveResp = await fetch(REST_BASE, {
+        method: 'POST',
+        headers: supabaseHeaders(),
+        body: JSON.stringify(payload),
+      });
+    }
+
+    if (!saveResp.ok) {
+      const errText = await saveResp.text();
+      throw new Error(`Supabase ${saveResp.status}: ${errText}`);
     }
 
     // 成功

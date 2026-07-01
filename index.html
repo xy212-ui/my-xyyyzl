@@ -6,6 +6,8 @@
   <title>鑫源供应链 · 运营品质看板</title>
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+  <!-- ★★★ Supabase JS SDK ★★★ -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
   <style>
     :root {
       --bg: #0d1117;
@@ -444,7 +446,17 @@
 
 <script>
 // ============================================================
-//  工具函数
+//  ★★★ Supabase 初始化 ★★★
+//  【重要】请将下面的 URL 和 ANON_KEY 替换为你自己的 Supabase 项目信息
+//  获取方式：登录 supabase.com → 你的项目 → Settings → API → 复制 Project URL 和 anon public key
+// ============================================================
+const SUPABASE_URL = 'https://qagilmopsjlbudgcpmbn.supabase.co';
+const SUPABASE_ANON_KEY = 'sb_publishable_BLKEFYFF5wduEPm9aMNgUQ_jXAAZCyd';
+
+const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+// ============================================================
+//  工具函数（完全不变）
 // ============================================================
 const $ = id => document.getElementById(id);
 let charts = {};
@@ -465,7 +477,7 @@ function fmtPct(v) {
 function destroyChart(id) { if (charts[id]) { charts[id].destroy(); delete charts[id]; } }
 
 // ============================================================
-//  格式化更新时间
+//  格式化更新时间（完全不变）
 // ============================================================
 function formatTime(iso) {
   if (!iso) return '--';
@@ -478,7 +490,7 @@ function formatTime(iso) {
 }
 
 // ============================================================
-//  Tab 切换
+//  Tab 切换（完全不变）
 // ============================================================
 document.querySelectorAll('.tab').forEach(tab => {
   tab.addEventListener('click', () => {
@@ -490,7 +502,7 @@ document.querySelectorAll('.tab').forEach(tab => {
 });
 
 // ============================================================
-//  读取 Excel
+//  读取 Excel（完全不变）
 // ============================================================
 function readExcel(file) {
   return new Promise((res, rej) => {
@@ -511,12 +523,11 @@ function sheetToRows(ws) {
 }
 
 // ============================================================
-//  解析时效报表
+//  解析时效报表（完全不变）
 // ============================================================
 function parseTimeEffect(wb) {
   const data = {};
 
-  // 送货时效播报表
   if (wb.SheetNames.includes('送货时效播报表')) {
     const rows = sheetToRows(wb.Sheets['送货时效播报表']);
     const titleStr = String(rows[0]?.[0] || '');
@@ -543,7 +554,6 @@ function parseTimeEffect(wb) {
     data.delivery = delivery;
   }
 
-  // 中转时效播报表
   if (wb.SheetNames.includes('中转时效播报表')) {
     const rows = sheetToRows(wb.Sheets['中转时效播报表']);
     const transfer = [];
@@ -570,7 +580,7 @@ function parseTimeEffect(wb) {
 }
 
 // ============================================================
-//  解析操作规范报表
+//  解析操作规范报表（完全不变）
 // ============================================================
 function parseOperation(wb) {
   const data = {};
@@ -618,7 +628,7 @@ function parseOperation(wb) {
 }
 
 // ============================================================
-//  解析时效报表的明细sheet
+//  解析时效报表的明细sheet（完全不变）
 // ============================================================
 function parseTimeDetails(wb) {
   const s1 = wb.SheetNames.find(n => n.includes('超48小时送货明细') || n.includes('超48h送货明细'));
@@ -635,7 +645,7 @@ function parseTimeDetails(wb) {
 }
 
 // ============================================================
-//  解析操作规范报表的明细sheet
+//  解析操作规范报表的明细sheet（完全不变）
 // ============================================================
 function parseOperationDetails(wb) {
   const s1 = wb.SheetNames.find(n => n.includes('签收异常明细'));
@@ -658,7 +668,7 @@ function parseOperationDetails(wb) {
 }
 
 // ============================================================
-//  全局数据状态
+//  全局数据状态（完全不变）
 // ============================================================
 let STATE = {
   timeEffect: null,
@@ -673,34 +683,48 @@ let STATE = {
 };
 
 // ============================================================
-//  ★★★ 云端数据同步 ★★★
+//  ★★★ Supabase 云端数据同步 ★★★
+//  替换原来的 fetch('/api/data') 方案
 // ============================================================
 
-// 从服务器或localStorage获取最新数据
+// Supabase 表名
+const TABLE_NAME = 'dashboard_data';
+
+// 从 Supabase 获取最新数据
 async function fetchServerData() {
-  // 1. 尝试从服务器API获取
+  // 1. 尝试从 Supabase 获取
   try {
-    const resp = await fetch('/api/data');
-    const result = await resp.json();
-    if (result.success && result.data) {
-      if (result.data.timeEffect) STATE.timeEffect = result.data.timeEffect;
-      if (result.data.operation) STATE.operation = result.data.operation;
-      if (result.data.details) STATE.details = result.data.details;
-      if (result.data.updatedAt) {
-        $('updatedAt').textContent = '更新时间：' + formatTime(result.data.updatedAt);
+    const { data, error } = await supabase
+      .from(TABLE_NAME)
+      .select('*')
+      .order('updated_at', { ascending: false })
+      .limit(1)
+      .single();
+
+    if (!error && data) {
+      // Supabase 返回的字段名，映射到 STATE
+      if (data.time_effect) STATE.timeEffect = data.time_effect;
+      if (data.operation) STATE.operation = data.operation;
+      if (data.details) STATE.details = data.details;
+      if (data.updated_at) {
+        $('updatedAt').textContent = '更新时间：' + formatTime(data.updated_at);
       }
-      // 同时缓存到localStorage
+      // 同步缓存到 localStorage
       saveToLocal();
       $('syncBar').style.background = 'rgba(34,197,94,0.08)';
       $('syncBar').style.borderColor = 'rgba(34,197,94,0.2)';
-      $('syncHint').textContent = '✅ 数据来自服务器，全员可见';
+      $('syncHint').textContent = '✅ 数据来自 Supabase 云端，全员可见';
       return true;
     }
+    // 如果是 "No rows found" 错误（PGRST116），说明表空，继续往下走
+    if (error && error.code !== 'PGRST116') {
+      console.warn('Supabase 查询出错:', error.message);
+    }
   } catch (err) {
-    console.warn('服务器不可达，尝试本地缓存:', err);
+    console.warn('Supabase 不可达，尝试本地缓存:', err);
   }
 
-  // 2. 尝试从localStorage获取
+  // 2. 尝试从 localStorage 获取（降级方案）
   try {
     const local = localStorage.getItem('xinyuan_dashboard_data');
     if (local) {
@@ -713,7 +737,7 @@ async function fetchServerData() {
       }
       $('syncBar').style.background = 'rgba(245,158,11,0.08)';
       $('syncBar').style.borderColor = 'rgba(245,158,11,0.2)';
-      $('syncHint').textContent = '⚠️ 数据来自本地缓存，仅当前浏览器可见（需部署后端服务器才能全员共享）';
+      $('syncHint').textContent = '⚠️ 数据来自本地缓存，仅当前浏览器可见（Supabase 连接异常）';
       return true;
     }
   } catch (err) {
@@ -723,7 +747,7 @@ async function fetchServerData() {
   return false;
 }
 
-// 保存数据到localStorage
+// 保存数据到 localStorage（完全不变，作为本地缓存）
 function saveToLocal() {
   try {
     const data = {
@@ -738,51 +762,61 @@ function saveToLocal() {
   }
 }
 
-// 保存数据到服务器
+// 保存数据到 Supabase
 async function saveToServer() {
-  // 先保存到localStorage（确保本地也有）
+  // 先保存到 localStorage（确保本地也有）
   STATE.updatedAt = new Date().toISOString();
   saveToLocal();
   $('updatedAt').textContent = '更新时间：' + formatTime(STATE.updatedAt);
 
-  // 尝试保存到服务器
+  // 尝试保存到 Supabase
   try {
-    const resp = await fetch('/api/data', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        timeEffect: STATE.timeEffect,
-        operation: STATE.operation,
-        details: STATE.details,
-      }),
-    });
-    const result = await resp.json();
-    if (result.success) {
-      $('updatedAt').textContent = '更新时间：' + formatTime(result.updatedAt);
-      $('syncBar').style.background = 'rgba(34,197,94,0.08)';
-      $('syncBar').style.borderColor = 'rgba(34,197,94,0.2)';
-      $('syncHint').textContent = '✅ 数据已保存至服务器，全员可见';
-      showToast('数据已同步至云端，所有人可查看');
-      // 更新localStorage缓存
-      STATE.updatedAt = result.updatedAt;
-      saveToLocal();
+    const payload = {
+      time_effect: STATE.timeEffect,
+      operation: STATE.operation,
+      details: STATE.details,
+      updated_at: STATE.updatedAt,
+    };
+
+    // 使用 upsert：如果已有 id=1 的记录就更新，否则插入
+    // 先查一下有没有已有记录
+    const { data: existing } = await supabase
+      .from(TABLE_NAME)
+      .select('id')
+      .limit(1);
+
+    if (existing && existing.length > 0) {
+      // 更新已有记录
+      const { error } = await supabase
+        .from(TABLE_NAME)
+        .update(payload)
+        .eq('id', existing[0].id);
+      if (error) throw error;
     } else {
-      $('syncBar').style.background = 'rgba(245,158,11,0.08)';
-      $('syncBar').style.borderColor = 'rgba(245,158,11,0.2)';
-      $('syncHint').textContent = '⚠️ 数据已保存至本地，仅当前浏览器可见';
-      showToast('数据已保存（本地模式），部署后端后可实现全员共享');
+      // 插入新记录
+      const { error } = await supabase
+        .from(TABLE_NAME)
+        .insert(payload);
+      if (error) throw error;
     }
+
+    // 成功
+    $('syncBar').style.background = 'rgba(34,197,94,0.08)';
+    $('syncBar').style.borderColor = 'rgba(34,197,94,0.2)';
+    $('syncHint').textContent = '✅ 数据已保存至 Supabase 云端，全员可见';
+    showToast('数据已同步至云端，所有人可查看');
+
   } catch (err) {
-    console.warn('保存到服务器失败:', err);
+    console.warn('保存到 Supabase 失败:', err);
     $('syncBar').style.background = 'rgba(245,158,11,0.08)';
     $('syncBar').style.borderColor = 'rgba(245,158,11,0.2)';
-    $('syncHint').textContent = '⚠️ 数据已保存至本地，仅当前浏览器可见';
-    showToast('数据已保存（本地模式），部署后端后可实现全员共享');
+    $('syncHint').textContent = '⚠️ 数据已保存至本地缓存（Supabase 连接异常），仅当前浏览器可见';
+    showToast('数据已保存（本地模式），Supabase 连接后可实现全员共享');
   }
 }
 
 // ============================================================
-//  渲染全部
+//  渲染全部（完全不变）
 // ============================================================
 function renderAll() {
   const te = STATE.timeEffect;
@@ -797,7 +831,7 @@ function renderAll() {
 }
 
 // ============================================================
-//  KPI 卡片
+//  KPI 卡片（完全不变）
 // ============================================================
 function renderKPI(te, op) {
   const grid = $('kpiGrid');
@@ -910,7 +944,7 @@ function renderKPI(te, op) {
 }
 
 // ============================================================
-//  送货时效图表
+//  送货时效图表（完全不变）
 // ============================================================
 function renderDelivery(rows) {
   const data = rows.filter(r => r.name !== '总计' && r.total > 0);
@@ -956,7 +990,7 @@ function renderDelivery(rows) {
 }
 
 // ============================================================
-//  中转时效图表
+//  中转时效图表（完全不变）
 // ============================================================
 function renderTransfer(rows) {
   const data = rows.filter(r => r.name !== '总计' && r.total > 0);
@@ -1000,7 +1034,7 @@ function renderTransfer(rows) {
 }
 
 // ============================================================
-//  操作规范图表
+//  操作规范图表（完全不变）
 // ============================================================
 function renderOperation(ops) {
   const data = ops.filter(r => r.name !== '合计');
@@ -1051,7 +1085,7 @@ function renderOperation(ops) {
 }
 
 // ============================================================
-//  表格渲染
+//  表格渲染（完全不变）
 // ============================================================
 function renderTable(id, rows, opts = {}) {
   const table = $(id);
@@ -1074,7 +1108,7 @@ function renderTable(id, rows, opts = {}) {
 }
 
 // ============================================================
-//  Chart 配置工厂
+//  Chart 配置工厂（完全不变）
 // ============================================================
 function baseChartOpts() {
   return {
@@ -1105,7 +1139,7 @@ function chartBarOpts(yLabel, color) {
 }
 
 // ============================================================
-//  ★★★ 文件上传处理（上传后自动保存到服务器）★★★
+//  ★★★ 文件上传处理（上传后自动保存到 Supabase）★★★
 // ============================================================
 $('fileTimeEffect').addEventListener('change', async e => {
   const file = e.target.files[0];
@@ -1116,7 +1150,7 @@ $('fileTimeEffect').addEventListener('change', async e => {
     STATE.timeEffect = parseTimeEffect(wb);
     parseTimeDetails(wb);
     renderAll();
-    // ★ 自动保存到服务器
+    // ★ 自动保存到 Supabase 云端
     await saveToServer();
     showToast('时效报表加载成功：' + file.name);
   } catch(err) {
@@ -1135,7 +1169,7 @@ $('fileOperation').addEventListener('change', async e => {
     STATE.operation = parseOperation(wb);
     parseOperationDetails(wb);
     renderAll();
-    // ★ 自动保存到服务器
+    // ★ 自动保存到 Supabase 云端
     await saveToServer();
     showToast('操作规范报表加载成功：' + file.name);
   } catch(err) {
@@ -1146,7 +1180,7 @@ $('fileOperation').addEventListener('change', async e => {
 });
 
 // ============================================================
-//  内置初始数据（6.1-6.21）— 仅在服务器无数据时使用
+//  内置初始数据（6.1-6.21）— 仅在云端和本地均无数据时使用（完全不变）
 // ============================================================
 function loadDefaultData() {
   STATE.timeEffect = {
@@ -1316,20 +1350,20 @@ function loadDefaultData() {
 }
 
 // ============================================================
-//  ★★★ 页面初始化：优先服务器 → 其次本地缓存 → 最后内置数据 ★★★
+//  ★★★ 页面初始化：优先 Supabase → 其次本地缓存 → 最后内置数据 ★★★
 // ============================================================
 async function init() {
   showLoading(true);
   const hasData = await fetchServerData();
   if (hasData && (STATE.timeEffect || STATE.operation)) {
-    // 有数据（来自服务器或本地缓存），直接使用
+    // 有数据（来自 Supabase 或本地缓存），直接使用
     renderAll();
   } else {
     // 无任何数据，使用内置默认数据，并保存到本地
     loadDefaultData();
     STATE.updatedAt = new Date().toISOString();
     saveToLocal();
-    // 尝试保存到服务器（如果服务器可用）
+    // 尝试保存到 Supabase（如果连接可用）
     try {
       await saveToServer();
     } catch (err) { /* 忽略 */ }
@@ -1340,7 +1374,7 @@ async function init() {
 init();
 
 // ============================================================
-//  明细弹窗功能
+//  明细弹窗功能（完全不变）
 // ============================================================
 function showDetailModal(title, detailKey) {
   const overlay = $('detailModal');
@@ -1359,7 +1393,7 @@ function showDetailModal(title, detailKey) {
   overlay.classList.add('active');
 }
 
-// 关闭弹窗
+// 关闭弹窗（完全不变）
 $('modalClose').addEventListener('click', () => $('detailModal').classList.remove('active'));
 $('detailModal').addEventListener('click', e => { if (e.target === $('detailModal')) $('detailModal').classList.remove('active'); });
 
